@@ -6,7 +6,6 @@
 <title>삼국지 II - 웹 플레이어</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
     background: #0a0a0a;
     color: #c8a96e;
@@ -16,7 +15,6 @@
     align-items: center;
     min-height: 100vh;
   }
-
   header {
     width: 100%;
     max-width: 1040px;
@@ -26,21 +24,17 @@
     gap: 16px;
     border-bottom: 1px solid #2a2010;
   }
-
   header h1 {
     font-size: 20px;
     font-weight: 700;
     letter-spacing: 4px;
     color: #e8c87a;
-    text-shadow: 0 0 20px #c8a00040;
   }
-
   header span {
     font-size: 12px;
     color: #6a5a3a;
     letter-spacing: 2px;
   }
-
   .screen-wrap {
     position: relative;
     margin: 24px auto 0;
@@ -50,15 +44,10 @@
     background: #000;
     aspect-ratio: 4/3;
   }
-
-  #canvas {
-    display: block;
+  #dosbox {
     width: 100%;
     height: 100%;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
   }
-
   #loading-overlay {
     position: absolute;
     inset: 0;
@@ -69,21 +58,19 @@
     justify-content: center;
     gap: 24px;
     z-index: 10;
+    pointer-events: none;
   }
-
   .loading-title {
     font-size: 28px;
     font-weight: 700;
     letter-spacing: 8px;
     color: #e8c87a;
   }
-
   .loading-sub {
     font-size: 12px;
     letter-spacing: 3px;
     color: #6a5a3a;
   }
-
   .progress-bar {
     width: 320px;
     height: 3px;
@@ -91,7 +78,6 @@
     border-radius: 2px;
     overflow: hidden;
   }
-
   .progress-fill {
     height: 100%;
     background: #c8a96e;
@@ -99,14 +85,12 @@
     width: 0%;
     transition: width 0.3s ease;
   }
-
   #status-text {
     font-size: 11px;
     color: #4a3a20;
     letter-spacing: 1px;
     min-height: 16px;
   }
-
   .controls {
     width: 1024px;
     max-width: calc(100vw - 32px);
@@ -115,7 +99,6 @@
     gap: 8px;
     align-items: center;
   }
-
   .btn {
     padding: 7px 16px;
     background: transparent;
@@ -128,30 +111,10 @@
     transition: all 0.15s;
     font-family: inherit;
   }
-
-  .btn:hover {
-    border-color: #c8a96e;
-    color: #e8c87a;
-    background: #1a1208;
-  }
-
-  .btn:active { transform: scale(0.97); }
-
-  .hint {
-    margin-left: auto;
-    font-size: 11px;
-    color: #3a2a10;
-    letter-spacing: 1px;
-  }
-
-  footer {
-    margin: 32px auto;
-    font-size: 11px;
-    color: #2a1e08;
-    letter-spacing: 2px;
-  }
-
-  #error-msg {
+  .btn:hover { border-color: #c8a96e; color: #e8c87a; background: #1a1208; }
+  .hint { margin-left: auto; font-size: 11px; color: #3a2a10; letter-spacing: 1px; }
+  footer { margin: 32px auto; font-size: 11px; color: #2a1e08; letter-spacing: 2px; }
+  #error-box {
     display: none;
     position: absolute;
     inset: 0;
@@ -164,9 +127,8 @@
     text-align: center;
     padding: 32px;
   }
-
-  #error-msg h2 { color: #a04030; font-size: 16px; letter-spacing: 2px; }
-  #error-msg p  { color: #6a4a3a; font-size: 12px; line-height: 1.8; }
+  #error-box h2 { color: #a04030; font-size: 16px; letter-spacing: 2px; }
+  #error-box p  { color: #6a4a3a; font-size: 12px; line-height: 1.8; white-space: pre-line; }
 </style>
 </head>
 <body>
@@ -177,7 +139,7 @@
 </header>
 
 <div class="screen-wrap">
-  <canvas id="canvas"></canvas>
+  <div id="dosbox"></div>
 
   <div id="loading-overlay">
     <div class="loading-title">三國志 II</div>
@@ -188,32 +150,30 @@
     <div id="status-text">초기화 중...</div>
   </div>
 
-  <div id="error-msg">
+  <div id="error-box">
     <h2>⚠ 실행 오류</h2>
-    <p id="error-detail">DOSBox 로드에 실패했습니다.<br>페이지를 새로고침하거나 다른 브라우저를 사용해 주세요.</p>
+    <p id="error-detail"></p>
   </div>
 </div>
 
 <div class="controls">
   <button class="btn" onclick="toggleFullscreen()">전체화면</button>
-  <button class="btn" onclick="sendKey('F5')">저장 (F5)</button>
-  <button class="btn" onclick="sendKey('F7')">불러오기 (F7)</button>
   <button class="btn" onclick="restartGame()">재시작</button>
-  <span class="hint">클릭 후 키보드 사용 가능</span>
+  <span class="hint">화면 클릭 후 키보드 사용 가능 · F5 저장 · F7 불러오기</span>
 </div>
 
 <footer>KOEI Co., Ltd. 1989 · 웹 에뮬레이션</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/js-dos@7.x/dist/js-dos.js"></script>
-<script>
-const canvas   = document.getElementById('canvas');
-const overlay  = document.getElementById('loading-overlay');
-const errBox   = document.getElementById('error-msg');
-const errDetail= document.getElementById('error-detail');
-const fill     = document.getElementById('progress-fill');
-const statusTx = document.getElementById('status-text');
+<!-- js-dos 6.22 (안정적인 구버전 API) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/js-dos@6.22.60/dist/js-dos.css">
+<script src="https://cdn.jsdelivr.net/npm/js-dos@6.22.60/dist/js-dos.js"></script>
 
-let ci = null;
+<script>
+const overlay   = document.getElementById('loading-overlay');
+const errBox    = document.getElementById('error-box');
+const errDetail = document.getElementById('error-detail');
+const fill      = document.getElementById('progress-fill');
+const statusTx  = document.getElementById('status-text');
 
 function setProgress(pct, msg) {
   fill.style.width = pct + '%';
@@ -228,14 +188,18 @@ function showError(msg) {
 
 async function startGame() {
   try {
-    setProgress(10, 'DOSBox 엔진 초기화...');
-
     if (typeof Dos === 'undefined') {
-      showError('js-dos 라이브러리 로드 실패.\n네트워크 연결을 확인하거나 페이지를 새로고침해 주세요.');
+      showError('js-dos 라이브러리 로드 실패.\n페이지를 새로고침해 주세요.');
       return;
     }
 
-    setProgress(30, '가상 파일시스템 준비...');
+    setProgress(20, 'DOSBox 초기화...');
+
+    const dos = await Dos(document.getElementById('dosbox'), {
+      wdosboxUrl: 'https://cdn.jsdelivr.net/npm/js-dos@6.22.60/dist/wdosbox.js',
+    });
+
+    setProgress(50, '게임 파일 로드 중...');
 
     const gameFiles = [
       'RTK2.COM', 'MAIN.EXE', 'OPEN.EXE', 'END.EXE', 'SOUND.EXE',
@@ -245,50 +209,62 @@ async function startGame() {
       'KOEI.BAT', 'dosbox.conf'
     ];
 
-    setProgress(50, '게임 파일 로드 중...');
+    setProgress(70, '파일 마운트 중...');
 
-    ci = await Dos(canvas, {
-      wdosboxUrl: 'https://cdn.jsdelivr.net/npm/js-dos@7.x/dist/wdosbox.js',
+    const ci = await dos.run({
+      dosboxConf: `
+[sdl]
+output=surface
+
+[dosbox]
+machine=svga_s3
+memsize=16
+
+[cpu]
+core=auto
+cycles=max
+
+[sblaster]
+sbtype=sb16
+sbbase=220
+irq=7
+dma=1
+
+[dos]
+xms=true
+ems=true
+
+[autoexec]
+@echo off
+mount c .
+c:
+RTK2.COM
+      `,
+      fs: {
+        '.': gameFiles
+      },
       onprogress: (stage, total, loaded) => {
-        const pct = 50 + Math.round((loaded / (total || 1)) * 30);
-        setProgress(pct, stage);
+        const pct = 70 + Math.round((loaded / Math.max(total, 1)) * 25);
+        setProgress(Math.min(pct, 95), stage || '로딩 중...');
       }
     });
 
-    setProgress(85, '게임 파일 마운트...');
-
-    const fs = await ci.mount('/', gameFiles.map(f => ({
-      path: f,
-      url: f
-    })));
-
-    setProgress(95, '삼국지 II 실행 중...');
-
-    await ci.run('RTK2.COM');
-
-    setProgress(100, '완료!');
-    setTimeout(() => { overlay.style.display = 'none'; }, 600);
+    setProgress(100, '실행!');
+    setTimeout(() => { overlay.style.display = 'none'; }, 500);
 
   } catch (e) {
     console.error(e);
-    showError('오류: ' + (e.message || e));
+    showError('오류: ' + (e.message || String(e)));
   }
 }
 
 function toggleFullscreen() {
   const wrap = document.querySelector('.screen-wrap');
   if (!document.fullscreenElement) {
-    wrap.requestFullscreen?.() || wrap.webkitRequestFullscreen?.();
+    (wrap.requestFullscreen || wrap.webkitRequestFullscreen).call(wrap);
   } else {
-    document.exitFullscreen?.() || document.webkitExitFullscreen?.();
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
   }
-}
-
-function sendKey(key) {
-  if (!ci) return;
-  canvas.focus();
-  canvas.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-  canvas.dispatchEvent(new KeyboardEvent('keyup',   { key, bubbles: true }));
 }
 
 function restartGame() {
