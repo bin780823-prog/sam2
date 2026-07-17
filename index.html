@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>삼국지 II - 웹 플레이어</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #c8a96e;
+    font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  header {
+    width: 100%;
+    max-width: 1040px;
+    padding: 18px 24px 10px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid #2a2010;
+  }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 4px; color: #e8c87a; }
+  header span { font-size: 12px; color: #6a5a3a; letter-spacing: 2px; }
+  .screen-wrap {
+    position: relative;
+    margin: 24px auto 0;
+    width: 1024px;
+    max-width: calc(100vw - 32px);
+    border: 1px solid #2a2010;
+    background: #000;
+    aspect-ratio: 4/3;
+    overflow: hidden;
+  }
+  #jsdos {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    image-rendering: pixelated;
+  }
+  #loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: #050300;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    z-index: 10;
+  }
+  .loading-title { font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #e8c87a; }
+  .loading-sub { font-size: 12px; letter-spacing: 3px; color: #6a5a3a; }
+  .progress-bar { width: 320px; height: 3px; background: #1a1208; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #c8a96e; border-radius: 2px; width: 0%; transition: width 0.3s ease; }
+  #status-text { font-size: 11px; color: #4a3a20; letter-spacing: 1px; min-height: 16px; }
+  .controls {
+    width: 1024px;
+    max-width: calc(100vw - 32px);
+    margin: 12px auto 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn {
+    padding: 7px 16px;
+    background: transparent;
+    border: 1px solid #3a2a10;
+    color: #a08040;
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: #c8a96e; color: #e8c87a; background: #1a1208; }
+  .hint { margin-left: auto; font-size: 11px; color: #3a2a10; letter-spacing: 1px; }
+  footer { margin: 32px auto; font-size: 11px; color: #2a1e08; letter-spacing: 2px; }
+  #error-box {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: #050300;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 20;
+    text-align: center;
+    padding: 32px;
+  }
+  #error-box h2 { color: #a04030; font-size: 16px; }
+  #error-box p { color: #6a4a3a; font-size: 12px; line-height: 1.8; white-space: pre-line; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>三國志 II</h1>
+  <span>ROMANCE OF THE THREE KINGDOMS II</span>
+</header>
+
+<div class="screen-wrap" id="screen-wrap">
+  <canvas id="jsdos"></canvas>
+  <div id="loading-overlay">
+    <div class="loading-title">三國志 II</div>
+    <div class="loading-sub">ROMANCE OF THE THREE KINGDOMS II</div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div id="status-text">초기화 중...</div>
+  </div>
+  <div id="error-box">
+    <h2>⚠ 실행 오류</h2>
+    <p id="error-detail"></p>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn" onclick="toggleFullscreen()">전체화면</button>
+  <button class="btn" onclick="restartGame()">재시작</button>
+  <span class="hint">화면 클릭 후 키보드 사용 가능 · F5 저장 · F7 불러오기</span>
+</div>
+
+<footer>KOEI Co., Ltd. 1989 · 웹 에뮬레이션</footer>
+
+<script src="https://unpkg.com/js-dos@6.22.60/dist/js-dos.js"></script>
+<script>
+var overlay   = document.getElementById('loading-overlay');
+var errBox    = document.getElementById('error-box');
+var errDetail = document.getElementById('error-detail');
+var fill      = document.getElementById('progress-fill');
+var statusTx  = document.getElementById('status-text');
+
+function setProgress(pct, msg) {
+  fill.style.width = pct + '%';
+  statusTx.textContent = msg;
+}
+
+function showError(msg) {
+  overlay.style.display = 'none';
+  errBox.style.display  = 'flex';
+  errDetail.textContent = msg;
+}
+
+window.addEventListener('load', function() {
+  if (typeof Dos === 'undefined') {
+    showError('js-dos 로드 실패.\n페이지를 새로고침해 주세요.');
+    return;
+  }
+
+  setProgress(10, 'DOSBox 초기화 중...');
+
+  // ZIP URL을 절대경로로 지정 (현재 페이지 기준)
+  var zipUrl = window.location.href.replace(/\/[^\/]*$/, '/') + 'game.zip';
+
+  Dos(document.getElementById('jsdos'), {
+    wdosboxUrl: './wdosbox.js',
+  }).ready(function(fs, main) {
+
+    setProgress(40, '게임 파일 로드 중...');
+    console.log('ZIP URL:', zipUrl);
+
+    fs.extract(zipUrl).then(function() {
+      setProgress(90, '삼국지 II 실행 중...');
+      return main([
+        '-conf', 'dosbox_game.conf'
+      ]);
+    }).then(function() {
+      setTimeout(function() {
+        overlay.style.display = 'none';
+      }, 1500);
+    }).catch(function(e) {
+      console.error('extract error:', e);
+      showError('ZIP 로드 오류: ' + (e.message || String(e)));
+    });
+
+  }).catch(function(e) {
+    console.error('dos init error:', e);
+    showError('DOSBox 초기화 오류: ' + (e.message || String(e)));
+  });
+});
+
+function toggleFullscreen() {
+  var wrap = document.getElementById('screen-wrap');
+  if (!document.fullscreenElement) {
+    (wrap.requestFullscreen || wrap.webkitRequestFullscreen).call(wrap);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }
+}
+
+function restartGame() {
+  if (confirm('게임을 재시작하시겠습니까?')) location.reload();
+}
+</script>
+</body>
+</html>
